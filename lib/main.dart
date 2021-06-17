@@ -1,52 +1,129 @@
 import 'package:flutter/material.dart';
 import 'package:clipboard/clipboard.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 
-void main() {
-  runApp(MyApp());
+class Product {
+  const Product({
+    required this.name, 
+    required this.text,
+  });
+  final String name;
+  final String text;
 }
 
-class MyApp extends StatelessWidget {
+typedef void CartChangedCallback(Product product, bool inCart);
+
+class ShoppingListItem extends StatelessWidget {
+  ShoppingListItem({
+    required this.product,
+    required this.inCart,
+    required this.onCartChanged,
+  }) : super(key: ObjectKey(product));
+
+  final Product product;
+  final bool inCart;
+  final CartChangedCallback onCartChanged;
+
+  Color _getColor(BuildContext context) {
+    // The theme depends on the BuildContext because different
+    // parts of the tree can have different themes.
+    // The BuildContext indicates where the build is
+    // taking place and therefore which theme to use.
+
+    return inCart //
+        ? Colors.black54
+        : Theme.of(context).primaryColor;
+  }
+
+  TextStyle? _getTextStyle(BuildContext context) {
+    if (!inCart) return null;
+
+    return TextStyle(
+      color: Colors.black54,
+      decoration: TextDecoration.lineThrough,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
+    return ListTile(
+      onTap: () async {
+        // onCartChanged(product, inCart);
+        await FlutterClipboard.copy(product.text);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Clipboard Set'))
+        );
+      },
+      leading: CircleAvatar(
+        backgroundColor: _getColor(context),
+        child: Text(product.name[0]),
       ),
-      darkTheme: ThemeData(
-        brightness: Brightness.dark,
-      ),
-      home: HomePage(),
-      // debugShowCheckedModeBanner: false,
+      title: Text(product.name, style: _getTextStyle(context)),
     );
   }
 }
 
-class HomePage extends StatelessWidget {
-  Future<void> _setAndToast() async {
-    await FlutterClipboard.copy('\u200e'); // left-to-right mark
-    await Fluttertoast.showToast(msg: 'Clipboard set');
+class ShoppingList extends StatefulWidget {
+  ShoppingList({Key? key, required this.products}) : super(key: key);
+
+  final List<Product> products;
+
+  // The framework calls createState the first time
+  // a widget appears at a given location in the tree.
+  // If the parent rebuilds and uses the same type of
+  // widget (with the same key), the framework re-uses
+  // the State object instead of creating a new State object.
+
+  @override
+  _ShoppingListState createState() => _ShoppingListState();
+}
+
+class _ShoppingListState extends State<ShoppingList> {
+  Set<Product> _shoppingCart = Set<Product>();
+
+  void _handleCartChanged(Product product, bool inCart) {
+    setState(() {
+      // When a user changes what's in the cart, you need
+      // to change _shoppingCart inside a setState call to
+      // trigger a rebuild.
+      // The framework then calls build, below,
+      // which updates the visual appearance of the app.
+
+      if (!inCart)
+        _shoppingCart.add(product);
+      else
+        _shoppingCart.remove(product);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Left-to-right mark'),
-        backgroundColor: Colors.blue,
+        title: Text('Shopping List'),
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            ElevatedButton(
-              onPressed: _setAndToast,
-              child: Text('Set clipboard')
-            ),
-          ],
-        ),
+      body: ListView(
+        padding: EdgeInsets.symmetric(vertical: 8.0),
+        children: widget.products.map((Product product) {
+          return ShoppingListItem(
+            product: product,
+            inCart: _shoppingCart.contains(product),
+            onCartChanged: _handleCartChanged,
+          );
+        }).toList(),
       ),
     );
   }
+}
+
+void main() {
+  runApp(MaterialApp(
+    title: 'Shopping App',
+    home: ShoppingList(
+      products: <Product>[
+        Product(name: 'Eggs', text: 'a1'),
+        Product(name: 'Flour', text: 'a2'),
+        Product(name: 'Chocolate chips', text: 'a3'),
+      ],
+    ),
+  ));
 }
