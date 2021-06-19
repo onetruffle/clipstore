@@ -1,6 +1,13 @@
 # clipstore
 
-A new Flutter project.
+A quick little application to access your custom set of frequently used clipboard text snippets.
+
+For each text snippet,
+1. save the file in `assets/`
+2. name the file appropriately
+3. build the application, or just `flutter run --release`.
+
+<!-- A new Flutter project.
 
 ## Getting Started
 
@@ -13,4 +20,4 @@ A few resources to get you started if this is your first Flutter project:
 
 For help getting started with Flutter, view our
 [online documentation](https://flutter.dev/docs), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+samples, guidance on mobile development, and a full API reference. -->
