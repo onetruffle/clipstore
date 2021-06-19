@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:clipboard/clipboard.dart';
+import 'package:flutter/services.dart';
+import 'dart:convert';
 
 class Product {
   const Product({
-    required this.name, 
-    required this.text,
+    required this.name,
+    required this.data,
   });
   final String name;
-  final String text;
+  final String data;
 }
 
 typedef void CartChangedCallback(Product product, bool inCart);
@@ -24,11 +26,6 @@ class ShoppingListItem extends StatelessWidget {
   final CartChangedCallback onCartChanged;
 
   Color _getColor(BuildContext context) {
-    // The theme depends on the BuildContext because different
-    // parts of the tree can have different themes.
-    // The BuildContext indicates where the build is
-    // taking place and therefore which theme to use.
-
     return inCart //
         ? Colors.black54
         : Theme.of(context).primaryColor;
@@ -48,10 +45,9 @@ class ShoppingListItem extends StatelessWidget {
     return ListTile(
       onTap: () async {
         // onCartChanged(product, inCart);
-        await FlutterClipboard.copy(product.text);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Clipboard Set'))
-        );
+        await FlutterClipboard.copy(product.data);
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Clipboard Set')));
       },
       leading: CircleAvatar(
         backgroundColor: _getColor(context),
@@ -63,31 +59,14 @@ class ShoppingListItem extends StatelessWidget {
 }
 
 class ShoppingList extends StatefulWidget {
-  ShoppingList({Key? key, required this.products}) : super(key: key);
-
-  final List<Product> products;
-
-  // The framework calls createState the first time
-  // a widget appears at a given location in the tree.
-  // If the parent rebuilds and uses the same type of
-  // widget (with the same key), the framework re-uses
-  // the State object instead of creating a new State object.
-
   @override
   _ShoppingListState createState() => _ShoppingListState();
 }
 
 class _ShoppingListState extends State<ShoppingList> {
   Set<Product> _shoppingCart = Set<Product>();
-
   void _handleCartChanged(Product product, bool inCart) {
     setState(() {
-      // When a user changes what's in the cart, you need
-      // to change _shoppingCart inside a setState call to
-      // trigger a rebuild.
-      // The framework then calls build, below,
-      // which updates the visual appearance of the app.
-
       if (!inCart)
         _shoppingCart.add(product);
       else
@@ -95,22 +74,53 @@ class _ShoppingListState extends State<ShoppingList> {
     });
   }
 
+  List<Product> products = [];
+
+  Future<void> _setAndSnack(BuildContext context) async {
+    await FlutterClipboard.copy('\u200e'); // left-to-right mark
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text('Clipboard set')));
+  }
+
+  Future<String> loadList() async {
+    var assetString = await rootBundle.loadString('AssetManifest.json');
+    var filepaths = json.decode(assetString).keys;
+    filepaths = filepaths
+        .where(
+            (key) => key.startsWith('assets/') && !key.contains('.gitignore'))
+        .toList();
+    var productFutures = filepaths.map<Future<Product>>((String key) async {
+      var data = await rootBundle.loadString(key);
+      return Product(name: key.substring(7), data: data);
+    });
+    products = await Future.wait(productFutures);
+    return 'List loaded';
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Shopping List'),
-      ),
-      body: ListView(
-        padding: EdgeInsets.symmetric(vertical: 8.0),
-        children: widget.products.map((Product product) {
-          return ShoppingListItem(
-            product: product,
-            inCart: _shoppingCart.contains(product),
-            onCartChanged: _handleCartChanged,
-          );
-        }).toList(),
-      ),
+    return FutureBuilder<String>(
+      future: loadList(),
+      builder: (BuildContext context, AsyncSnapshot<String> snapshot) {
+        return Scaffold(
+          appBar: AppBar(
+            title: Text('clipstore'),
+          ),
+          body: ListView(
+            padding: EdgeInsets.symmetric(vertical: 8.0),
+            children: products.map((Product product) {
+              return ShoppingListItem(
+                product: product,
+                inCart: _shoppingCart.contains(product),
+                onCartChanged: (product, inCart) {
+                  _handleCartChanged(product, inCart);
+                  _setAndSnack(context);
+                },
+              );
+            }).toList(),
+          ),
+        );
+      },
     );
   }
 }
@@ -118,12 +128,6 @@ class _ShoppingListState extends State<ShoppingList> {
 void main() {
   runApp(MaterialApp(
     title: 'Shopping App',
-    home: ShoppingList(
-      products: <Product>[
-        Product(name: 'Eggs', text: 'a1'),
-        Product(name: 'Flour', text: 'a2'),
-        Product(name: 'Chocolate chips', text: 'a3'),
-      ],
-    ),
+    home: ShoppingList(),
   ));
 }
