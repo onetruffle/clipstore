@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:clipboard/clipboard.dart';
 import 'package:flutter/services.dart';
@@ -18,12 +20,10 @@ class ShoppingListItem extends StatelessWidget {
   ShoppingListItem({
     required this.product,
     required this.inCart,
-    required this.onCartChanged,
   }) : super(key: ObjectKey(product));
 
   final Product product;
   final bool inCart;
-  final CartChangedCallback onCartChanged;
 
   Color _getColor(BuildContext context) {
     return inCart //
@@ -44,10 +44,12 @@ class ShoppingListItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       onTap: () async {
-        // onCartChanged(product, inCart);
         await FlutterClipboard.copy(product.data);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Clipboard Set')));
+        ScaffoldMessenger.of(context).removeCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          duration: Duration(milliseconds: 1500),
+          content: Text('Copied to Clipboard'),
+        ));
       },
       leading: CircleAvatar(
         backgroundColor: _getColor(context),
@@ -64,30 +66,15 @@ class ShoppingList extends StatefulWidget {
 }
 
 class _ShoppingListState extends State<ShoppingList> {
-  Set<Product> _shoppingCart = Set<Product>();
-  void _handleCartChanged(Product product, bool inCart) {
-    setState(() {
-      if (!inCart)
-        _shoppingCart.add(product);
-      else
-        _shoppingCart.remove(product);
-    });
-  }
 
   List<Product> products = [];
 
-  Future<void> _setAndSnack(BuildContext context) async {
-    await FlutterClipboard.copy('\u200e'); // left-to-right mark
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text('Clipboard set')));
-  }
-
-  Future<String> loadList() async {
+  Future<String> _loadList() async {
     var assetString = await rootBundle.loadString('AssetManifest.json');
-    var filepaths = json.decode(assetString).keys;
-    filepaths = filepaths
-        .where(
-            (key) => key.startsWith('assets/') && !key.contains('.gitignore'))
+    var filepaths = json
+        .decode(assetString)
+        .keys
+        .where((key) => key.startsWith('assets/') && !key.contains('.gitignore'))
         .toList();
     var productFutures = filepaths.map<Future<Product>>((String key) async {
       var data = await rootBundle.loadString(key);
@@ -100,25 +87,24 @@ class _ShoppingListState extends State<ShoppingList> {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<String>(
-      future: loadList(),
+      future: _loadList(),
       builder: (BuildContext context, AsyncSnapshot<String> snapshot) {
         return Scaffold(
           appBar: AppBar(
             title: Text('clipstore'),
           ),
-          body: ListView(
-            padding: EdgeInsets.symmetric(vertical: 8.0),
-            children: products.map((Product product) {
-              return ShoppingListItem(
-                product: product,
-                inCart: _shoppingCart.contains(product),
-                onCartChanged: (product, inCart) {
-                  _handleCartChanged(product, inCart);
-                  _setAndSnack(context);
-                },
-              );
-            }).toList(),
-          ),
+          body: Center(
+            child: ListView(
+              shrinkWrap: true,
+              padding: EdgeInsets.symmetric(vertical: 8.0),
+              children: products.map((Product product) {
+                return ShoppingListItem(
+                  product: product,
+                  inCart: false,
+                );
+              }).toList(),
+            ),
+          )
         );
       },
     );
@@ -127,7 +113,7 @@ class _ShoppingListState extends State<ShoppingList> {
 
 void main() {
   runApp(MaterialApp(
-    title: 'Shopping App',
+    darkTheme: ThemeData.dark(),
     home: ShoppingList(),
   ));
 }
